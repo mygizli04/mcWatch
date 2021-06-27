@@ -1,0 +1,26 @@
+{
+  "name": "mcwatch",
+  "version": "1.0.0",
+  "description": "Allows you to watch and manage minecraft servers from javascript",
+  "main": "/lib/index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mygizli04/mcWatch.git"
+  },
+  "author": "mygizli04",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mygizli04/mcWatch/issues"
+  },
+  "homepage": "https://github.com/mygizli04/mcWatch#readme",
+  "dependencies": {
+    "@types/node-fetch": "^2.5.10",
+    "node-fetch": "^2.6.1"
+  }
+}
