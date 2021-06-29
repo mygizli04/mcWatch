@@ -239,6 +239,17 @@ let partialUsers: Array<{
 
 function predefinedMessages(message: string, server: Server, thread: string): void {
 
+    if (message.includes(" lost connection: ") && thread === "Server thread") {
+        // Remove player from the playerlist
+        server.players.splice(server.players.indexOf(server.players.find((value) => value.name === message.substring(0, message.indexOf(" "))) as Player), 1)
+        // username, reason
+        server.emit('disconnect', message.substring(0, message.indexOf(" ")), message.substring(message.indexOf(":") + 1))
+    }
+
+    if (message.endsWith(" left the game") && thread === "Server thread") {
+        server.emit('leave', message.substring(0, message.indexOf(" ")))
+    }
+
     if (message.startsWith("Environment: ")) {
         message = message.substring(13)
         let values = message.split(",")
