@@ -2,6 +2,15 @@ import childProcess from 'child_process'
 import EventEmitter from 'events';
 import fs from 'fs'
 
+interface Player {
+    name: string,
+    uuid: string,
+    ip: string,
+    port: string,
+    entityId: string,
+    loginCoordinates: [number, number, number]
+}
+
 let previousLog = ""
 let currentLog = ""
 function startLogging(server: Server) {
@@ -45,6 +54,12 @@ export class Server extends EventEmitter {
      */
     ready: boolean = false
     _process
+
+    /**
+     * Player list ([{name: uuid}])
+     */
+    players: Array<Player> = []
+
     /**
      * Send console command to the server.
      * 
@@ -93,6 +108,19 @@ export class Server extends EventEmitter {
                     }, 50)
                 }, 50)
             }
+        })
+    }
+    /**
+     * Stops the server.
+     * 
+     * @returns Promise
+     */
+    async stop(): Promise<void> {
+        return new Promise(resolve => {
+            this.sendCommand("stop")
+            this._process.on('exit', () => {
+                resolve()
+            })
         })
     }
 
@@ -152,11 +180,6 @@ export async function launch(location: string): Promise<Server> {
 
         let server = new Server({location, process: instance})
 
-
-        instance.on('exit', () => {
-            process.exit(1)
-        })
-
         instance.on('spawn', () => resolve(server))
 
         instance.stdout.on('data', data => {
@@ -205,7 +228,16 @@ function parseTime(time: string): Date {
     return new Date(ms)
 }
 
-function predefinedMessages(message: string, server: Server): void {
+let partialUsers: Array<{
+    name: string,
+    uuid: string,
+    ip?: string,
+    port?: string,
+    entityId?: string,
+    loginCoordinates?: [number, number, number]
+}> = []
+
+function predefinedMessages(message: string, server: Server, thread: string): void {
 
     if (message.startsWith("Environment: ")) {
         message = message.substring(13)
@@ -263,6 +295,30 @@ function predefinedMessages(message: string, server: Server): void {
         server.emit("gamemode", server.defaultGameMode)
     }
 
+    if (message.startsWith("UUID of player ") && thread.startsWith("User Authenticator")) {
+        partialUsers.push({
+            name: message.substring(15, message.indexOf(" ", 15)),
+            uuid: message.substring(message.lastIndexOf(" ") + 1)
+        })
+    }
+
+    if (message.includes("logged in with entity id") && thread === "Server thread") {
+        partialUsers.forEach((user, index, array) => {
+            if (user.name === message.substring(0, message.indexOf("["))) {
+                array.splice(index, 1)
+                user.ip = message.substring(message.indexOf("/") + 1, message.indexOf(":"))
+                user.port = message.substring(message.indexOf(":") + 1, message.indexOf("]"))
+                user.entityId = message.substring(message.indexOf(" logged in with entity id ") + 26, message.indexOf(" ", message.indexOf(" logged in with entity id ") + 26))
+                user.loginCoordinates = message.substring(message.indexOf("(") + 1, message.indexOf(")")).split(", ").map(coord => {return parseFloat(coord)}) as [number, number, number]
+                server.players?.push(user as Player)
+            }
+        })
+    }
+
+    if (message.endsWith(" joined the game") && thread === "Server thread") {
+        server.emit("join", server.players.find(player => {return player.name === message.substring(0, message.indexOf(" "))}))
+    }
+
     switch (message) {
         case 'You need to agree to the EULA in order to run the server. Go to eula.txt for more info.':
             throw "You need to agree to the minecraft EULA before you can run a server."
@@ -283,6 +339,6 @@ function parseStdout(stdout: string, server: Server) {
     let thread = stdout.substring(1, stdout.indexOf("/"))
     let messageType = stdout.substring(stdout.indexOf("/") + 1, stdout.indexOf("]"))
     stdout = stdout.substring(stdout.indexOf("]") + 3)
-    predefinedMessages(stdout, server)
-    server.emit(messageType.toLowerCase(), stdout, timestamp, thread)
+    predefinedMessages(stdout, server, thread)
+    server.emit(messageType.toLowerCase(), stdout, thread, timestamp)
 }

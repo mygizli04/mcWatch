@@ -19,7 +19,7 @@ describe('Check if the server can be interfaced with', () => {
     }, 180000)
 
     afterAll(() => {
-        server._process.kill()
+        server.stop().then(() => process.exit(1))
     })
 
     it('can send commands to the server', async () => {
